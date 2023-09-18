@@ -85,6 +85,8 @@ pub mod aes;
 pub mod analog;
 #[cfg(assist_debug)]
 pub mod assist_debug;
+#[cfg(ledc)]
+pub mod buzzer;
 pub mod clock;
 #[cfg(any(xtensa, all(riscv, systimer)))]
 pub mod delay;

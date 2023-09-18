@@ -136,10 +136,10 @@ pub trait ChannelHW<O: OutputPin> {
 
 /// Channel struct
 pub struct Channel<'a, S: TimerSpeed, O: OutputPin> {
-    ledc: &'a RegisterBlock,
-    timer: Option<&'a dyn TimerIFace<S>>,
-    number: Number,
-    output_pin: PeripheralRef<'a, O>,
+    pub(crate) ledc: &'a RegisterBlock,
+    pub(crate) timer: Option<&'a dyn TimerIFace<S>>,
+    pub(crate) number: Number,
+    pub(crate) output_pin: PeripheralRef<'a, O>,
 }
 
 impl<'a, S: TimerSpeed, O: OutputPin> Channel<'a, S, O> {
