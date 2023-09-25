@@ -1,3 +1,4 @@
+#![no_std]
 //! # Buzzer
 //!
 //! ## Overview
@@ -8,9 +9,7 @@
 //! the buzzer.
 
 use embedded_hal::prelude::_embedded_hal_blocking_delay_DelayMs;
-use fugit::RateExtU32;
-
-use crate::{
+use esp_hal_common::{
     clock::Clocks,
     gpio::OutputPin,
     ledc::{
@@ -20,8 +19,10 @@ use crate::{
         LEDC,
     },
     peripheral::{Peripheral, PeripheralRef},
+    peripherals,
     Delay,
 };
+use fugit::RateExtU32;
 
 /// Errors from Buzzer
 #[derive(Debug)]
@@ -101,6 +102,7 @@ pub struct Buzzer<'a, S: TimerSpeed, O: OutputPin, V: OutputPin> {
     output_pin: PeripheralRef<'a, O>,
     delay: Delay,
     volume: Option<Volume<'a, V>>,
+    clocks: &'a Clocks<'a>,
 }
 
 impl<'a, S: TimerSpeed, O: OutputPin + Peripheral<P = O>, V: OutputPin + Peripheral<P = V>>
@@ -116,16 +118,16 @@ where
         timer_number: timer::Number,
         channel_number: channel::Number,
         output_pin: impl Peripheral<P = O> + 'a,
-        clocks: &Clocks,
+        clocks: &'a Clocks,
     ) -> Self {
         let timer = ledc.get_timer(timer_number);
-        crate::into_ref!(output_pin);
         Self {
             timer,
             channel_number,
-            output_pin,
+            output_pin: output_pin.into_ref(),
             delay: Delay::new(clocks),
             volume: None::<Volume<'a, V>>,
+            clocks,
         }
     }
 
@@ -135,9 +137,8 @@ where
         volume_pin: impl Peripheral<P = V> + 'a,
         volume_type: VolumeType,
     ) {
-        crate::into_ref!(volume_pin);
         self.volume = Some(Volume {
-            volume_pin,
+            volume_pin: volume_pin.into_ref(),
             volume_type,
             level: 50,
         });
@@ -153,7 +154,6 @@ where
             match volume.volume_type {
                 VolumeType::OnOff => {
                     let is_high = if level != 0 { true } else { false };
-                    debug!("Setting volume: {}", if is_high { "high" } else { "low" });
                     // Only turn off when level is set to 0, else set to high
                     volume.volume_pin.set_to_push_pull_output();
                     volume.volume_pin.set_output_high(is_high);
@@ -164,7 +164,6 @@ where
                     if !(0..100).contains(&level) {
                         return Err(Error::VolumeOutOfRange);
                     }
-                    debug!("Setting volume: {}", level);
                     volume.level = level;
                     // Put a dummy config in the timer if it's not already configured
                     if !self.timer.is_configured() {
@@ -228,15 +227,19 @@ where
             output_pin: self.output_pin.reborrow(),
         };
 
-        let duty = match frequency {
-            100..=4800 => timer::config::Duty::Duty4Bit,
-            25..=99 => timer::config::Duty::Duty6Bit,
-            5..=24 => timer::config::Duty::Duty8Bit,
-            1..=4 => timer::config::Duty::Duty10Bit,
-            _ => timer::config::Duty::Duty2Bit,
-        };
+        // Max duty resolution for a frequency:
+        // Integer(log2(LEDC_APB_CKL / frequency))
+        let mut result = 0;
+        let mut value = (self.clocks.apb_clock / frequency).raw();
+
+        // Limit duty resolution to 14 bits
+        while value > 1 && result < 14 {
+            value >>= 1;
+            result += 1;
+        }
+
         self.timer.configure(timer::config::Config {
-            duty,
+            duty: timer::config::Duty::from(result),
             clock_source: timer::LSClockSource::APBClk,
             frequency: frequency.Hz(),
         })?;
@@ -287,10 +290,8 @@ where
         for (note, timing) in sequence.iter().zip(timings.iter()) {
             // Mute if note is 0Hz
             if *note == 0 {
-                debug!("Muting for {}ms", timing);
                 self.mute()?;
             } else {
-                debug!("Beeping note: {}Hz for {}ms", note, timing);
                 self.play(*note)?;
             }
             self.delay.delay_ms(*timing);

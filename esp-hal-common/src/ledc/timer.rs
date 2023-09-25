@@ -89,6 +89,41 @@ pub mod config {
         Duty20Bit,
     }
 
+    /// Get a timer duty from a corresponding u32
+    impl From<u32> for Duty {
+        fn from(value: u32) -> Self {
+            match value {
+                1 => Self::Duty1Bit,
+                2 => Self::Duty2Bit,
+                3 => Self::Duty3Bit,
+                4 => Self::Duty4Bit,
+                5 => Self::Duty5Bit,
+                6 => Self::Duty6Bit,
+                7 => Self::Duty7Bit,
+                8 => Self::Duty8Bit,
+                9 => Self::Duty9Bit,
+                10 => Self::Duty10Bit,
+                11 => Self::Duty11Bit,
+                12 => Self::Duty12Bit,
+                13 => Self::Duty13Bit,
+                14 => Self::Duty14Bit,
+                #[cfg(esp32)]
+                15 => Self::Duty15Bit,
+                #[cfg(esp32)]
+                16 => Self::Duty16Bit,
+                #[cfg(esp32)]
+                17 => Self::Duty17Bit,
+                #[cfg(esp32)]
+                18 => Self::Duty18Bit,
+                #[cfg(esp32)]
+                19 => Self::Duty19Bit,
+                #[cfg(esp32)]
+                20 => Self::Duty20Bit,
+                _ => panic!("Invalid u32 value for Duty"),
+            }
+        }
+    }
+
     /// Timer configuration
     #[derive(Copy, Clone)]
     pub struct Config<CS> {

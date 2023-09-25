@@ -45,21 +45,21 @@ jobs:
 
       # Check all RISC-V targets:
       - name: check (esp32c3)
-        run: cd esp-hal-smartled/ && cargo +nightly check --features=esp32c3
+        run: cd extras/esp-hal-smartled/ && cargo +nightly check --features=esp32c3
       - name: check (esp32c6)
-        run: cd esp-hal-smartled/ && cargo +nightly check --features=esp32c6
+        run: cd extras/esp-hal-smartled/ && cargo +nightly check --features=esp32c6
       - name: check (esp32h2)
-        run: cd esp-hal-smartled/ && cargo +nightly check --features=esp32h2
+        run: cd extras/esp-hal-smartled/ && cargo +nightly check --features=esp32h2
       # Check all Xtensa targets:
       - name: check (esp32)
-        run: cd esp-hal-smartled/ && cargo +esp check --features=esp32,xtal-40mhz
+        run: cd extras/esp-hal-smartled/ && cargo +esp check --features=esp32,xtal-40mhz
       - name: check (esp32s2)
-        run: cd esp-hal-smartled/ && cargo +esp check --features=esp32s2
+        run: cd extras/esp-hal-smartled/ && cargo +esp check --features=esp32s2
       - name: check (esp32s3)
-        run: cd esp-hal-smartled/ && cargo +esp check --features=esp32s3
+        run: cd extras/esp-hal-smartled/ && cargo +esp check --features=esp32s3
       # Ensure documentation can be built (requires a chip feature!)
       - name: rustdoc
-        run: cd esp-hal-smartled/ && cargo doc --features=esp32c3,esp-hal-common/eh1
+        run: cd extras/esp-hal-smartled/ && cargo doc --features=esp32c3,esp-hal-common/eh1
 
   esp32-hal:
     runs-on: ubuntu-latest
@@ -697,7 +697,7 @@ jobs:
       - name: rustfmt (esp-hal-procmacros)
         run: cargo fmt --all --manifest-path=esp-hal-procmacros/Cargo.toml -- --check
       - name: rustfmt (esp-hal-smartled)
-        run: cargo fmt --all --manifest-path=esp-hal-smartled/Cargo.toml -- --check
+        run: cargo fmt --all --manifest-path=extras/esp-hal-smartled/Cargo.toml -- --check
       - name: rustfmt (esp-riscv-rt)
         run: cargo fmt --all --manifest-path=esp-riscv-rt/Cargo.toml -- --check
       - name: rustfmt (esp32-hal)

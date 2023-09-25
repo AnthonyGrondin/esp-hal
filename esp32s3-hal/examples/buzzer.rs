@@ -7,7 +7,6 @@
 #![no_main]
 
 use esp32s3_hal::{
-    buzzer::{songs, Buzzer, VolumeType},
     clock::ClockControl,
     gpio::IO,
     ledc::{channel, timer, LSGlobalClkSource, LEDC},
@@ -15,6 +14,7 @@ use esp32s3_hal::{
     prelude::*,
 };
 use esp_backtrace as _;
+use esp_hal_buzzer::{songs, Buzzer, VolumeType};
 use esp_println::println;
 
 #[entry]
