@@ -1,5 +1,4 @@
-//! Play songs through a piezo-electric buzzer plugged on GPI6
-//! value. Possible values (`u32`) are in range 0..100.
+//! Play songs through a piezo-electric buzzer plugged on GPIO6.
 //!
 //! This assumes that a piezo-electric buzzer is connected to the pin assigned
 //! to `buzzer`. (GPIO6)
@@ -8,7 +7,7 @@
 #![no_main]
 
 use esp32s3_hal::{
-    buzzer::{songs, Buzzer},
+    buzzer::{songs, Buzzer, VolumeType},
     clock::ClockControl,
     gpio::IO,
     ledc::{channel, timer, LSGlobalClkSource, LEDC},
@@ -38,12 +37,13 @@ fn main() -> ! {
         &clocks,
     );
 
-    let mut volume = io.pins.gpio7.into_push_pull_output();
-    volume.set_high().unwrap();
+    buzzer.with_volume(io.pins.gpio0, VolumeType::OnOff);
+    buzzer.set_volume(1).unwrap();
 
     buzzer.play_tones(songs::DOOM).unwrap();
     buzzer.play_tones(songs::FURELISE).unwrap();
     buzzer.play_tones(songs::NEVER_GONNA_GIVE_YOU_UP).unwrap();
+    buzzer.play_tones(songs::PACMAN).unwrap();
     buzzer.play_tones(songs::STAR_WARS).unwrap();
     buzzer.play_tones(songs::TAKE_ON_ME).unwrap();
     buzzer.play_tones(songs::TETRIS).unwrap();

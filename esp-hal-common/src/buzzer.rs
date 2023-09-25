@@ -2,7 +2,9 @@
 //!
 //! ## Overview
 //! This driver provides and abstraction over LEDC to drive a piezo-electric
-//! buzzer. The [songs] submodule contains pre-programmed songs to play through
+//! buzzer.
+//!
+//! The [songs] submodule contains pre-programmed songs to play through
 //! the buzzer.
 
 use embedded_hal::prelude::_embedded_hal_blocking_delay_DelayMs;
@@ -29,6 +31,12 @@ pub enum Error {
 
     /// Errors from [timer::Error]
     Timer(timer::Error),
+
+    /// Error when the volume pin isn't set and we try to use it
+    VolumeNotSet,
+
+    /// When the volume level is out of range. Either too low or too high.
+    VolumeOutOfRange,
 }
 
 /// Converts [channel::Error] into [self::Error]
@@ -55,14 +63,48 @@ pub struct ToneValue {
     pub duration: u32,
 }
 
-pub struct Buzzer<'a, S: TimerSpeed, O: OutputPin> {
+/// Represents different volume strategies for the buzzer.
+///
+/// - [VolumeType::OnOff] is a simple on or off volume. It's similar as using
+///   `.mute()`
+/// except that the volume control is on a second pin independant of the buzzer.
+///
+/// - [VolumeType::Duty] uses the duty as the volume control. It acts like a PWM
+/// by switching the power off and off. This may require extra logic gates in
+/// the circuit.
+pub enum VolumeType {
+    /// An On / Off based volume
+    OnOff,
+
+    /// A duty based volume where 0% is the lowest and 100% the highest.
+    Duty,
+}
+
+/// Volume configuration for the buzzer
+struct Volume<'a, V: OutputPin> {
+    /// Output pin for the volume
+    volume_pin: PeripheralRef<'a, V>,
+
+    /// Type of the volume
+    volume_type: VolumeType,
+
+    /// Volume level
+    ///
+    /// For [VolumeType::OnOff], should be 0 for Off, or 1 or more for On
+    /// For [VolumeType::Duty], should be between 1 and 99.
+    level: u8,
+}
+
+pub struct Buzzer<'a, S: TimerSpeed, O: OutputPin, V: OutputPin> {
     timer: Timer<'a, S>,
     channel_number: channel::Number,
     output_pin: PeripheralRef<'a, O>,
     delay: Delay,
+    volume: Option<Volume<'a, V>>,
 }
 
-impl<'a, S: TimerSpeed, O: OutputPin + Peripheral<P = O>> Buzzer<'a, S, O>
+impl<'a, S: TimerSpeed, O: OutputPin + Peripheral<P = O>, V: OutputPin + Peripheral<P = V>>
+    Buzzer<'a, S, O, V>
 where
     S: TimerSpeed<ClockSourceType = timer::LSClockSource>,
     Timer<'a, S>: TimerHW<S>,
@@ -83,6 +125,74 @@ where
             channel_number,
             output_pin,
             delay: Delay::new(clocks),
+            volume: None::<Volume<'a, V>>,
+        }
+    }
+
+    /// Add a volume control for the buzzer.
+    pub fn with_volume(
+        &mut self,
+        volume_pin: impl Peripheral<P = V> + 'a,
+        volume_type: VolumeType,
+    ) {
+        crate::into_ref!(volume_pin);
+        self.volume = Some(Volume {
+            volume_pin,
+            volume_type,
+            level: 50,
+        });
+    }
+
+    /// Set the volume of the buzzer
+    ///
+    /// For [VolumeType::Duty], the level should be between 0 and 99.
+    /// For [VolumeType::OnOff], it will only be mute on 0 and playing on 1 or
+    /// more
+    pub fn set_volume(&mut self, level: u8) -> Result<(), Error> {
+        if let Some(ref mut volume) = self.volume {
+            match volume.volume_type {
+                VolumeType::OnOff => {
+                    let is_high = if level != 0 { true } else { false };
+                    debug!("Setting volume: {}", if is_high { "high" } else { "low" });
+                    // Only turn off when level is set to 0, else set to high
+                    volume.volume_pin.set_to_push_pull_output();
+                    volume.volume_pin.set_output_high(is_high);
+                    Ok(())
+                }
+                VolumeType::Duty => {
+                    // Ensure that the volume is between 0 inclusively and 100 exclusively.
+                    if !(0..100).contains(&level) {
+                        return Err(Error::VolumeOutOfRange);
+                    }
+                    debug!("Setting volume: {}", level);
+                    volume.level = level;
+                    // Put a dummy config in the timer if it's not already configured
+                    if !self.timer.is_configured() {
+                        self.timer.configure(timer::config::Config {
+                            duty: timer::config::Duty::Duty10Bit,
+                            clock_source: timer::LSClockSource::APBClk,
+                            frequency: 10.Hz(),
+                        })?;
+                    }
+                    let ledc = unsafe { &*crate::peripherals::LEDC::ptr() };
+                    let mut channel = Channel {
+                        ledc,
+                        timer: None,
+                        number: self.channel_number,
+                        output_pin: volume.volume_pin.reborrow(),
+                    };
+
+                    channel
+                        .configure(channel::config::Config {
+                            timer: &self.timer,
+                            duty_pct: level,
+                            pin_config: channel::config::PinConfig::PushPull,
+                        })
+                        .map_err(|e| e.into())
+                }
+            }
+        } else {
+            return Err(Error::VolumeNotSet);
         }
     }
 
@@ -133,7 +243,8 @@ where
 
         channel.configure(channel::config::Config {
             timer: &self.timer,
-            duty_pct: 50,
+            // Use volume as duty if set since we use the same channel.
+            duty_pct: self.volume.as_ref().map_or(50, |v| v.level),
             pin_config: channel::config::PinConfig::PushPull,
         })?;
 
@@ -236,7 +347,7 @@ pub mod songs {
 
     use super::ToneValue;
 
-    /// Generate a Tone slice from Song beats and tempo
+    /// Generate a ToneValue slice from Song beats and tempo
     macro_rules! song {
         ($tempo:expr, [$(($note:expr, $duration:expr)),*]) => {
             {
@@ -250,7 +361,7 @@ pub mod songs {
         };
     }
 
-    // Note values on Hz
+    // Note values in Hz
     const NOTE_B0: u32 = 31;
     const NOTE_C1: u32 = 33;
     const NOTE_CS1: u32 = 35;
