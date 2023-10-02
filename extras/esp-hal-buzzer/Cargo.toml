@@ -17,6 +17,7 @@ embedded-hal     = { version = "0.2.7",  features = ["unproven"] }
 
 [features]
 esp32   = ["esp-hal-common/esp32"]
+esp32c2 = ["esp-hal-common/esp32c2"]
 esp32c3 = ["esp-hal-common/esp32c3"]
 esp32c6 = ["esp-hal-common/esp32c6"]
 esp32h2 = ["esp-hal-common/esp32h2"]

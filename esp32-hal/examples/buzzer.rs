@@ -6,7 +6,7 @@
 #![no_std]
 #![no_main]
 
-use esp32s3_hal::{
+use esp32_hal::{
     clock::ClockControl,
     gpio::IO,
     ledc::{channel, timer, LSGlobalClkSource, LEDC},
