@@ -26,6 +26,7 @@ use fugit::RateExtU32;
 
 /// Errors from Buzzer
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     /// Errors from [channel::Error]
     Channel(channel::Error),
@@ -73,6 +74,8 @@ pub struct ToneValue {
 /// - [VolumeType::Duty] uses the duty as the volume control. It acts like a PWM
 /// by switching the power off and off. This may require extra logic gates in
 /// the circuit.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum VolumeType {
     /// An On / Off based volume
     OnOff,
