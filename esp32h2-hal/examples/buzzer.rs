@@ -41,12 +41,18 @@ fn main() -> ! {
 
     buzzer.play_tones(songs::DOOM).unwrap();
     buzzer.play_tones(songs::FURELISE).unwrap();
+    buzzer.play_tones(songs::MERRY_CHRISTMAS).unwrap();
+    buzzer.play_tones(songs::MII_CHANNEL).unwrap();
     buzzer.play_tones(songs::NEVER_GONNA_GIVE_YOU_UP).unwrap();
+    buzzer.play_tones(songs::ODE_TO_JOY).unwrap();
     buzzer.play_tones(songs::PACMAN).unwrap();
     buzzer.play_tones(songs::STAR_WARS).unwrap();
+    buzzer.play_tones(songs::SUPER_MARIO_BROS).unwrap();
     buzzer.play_tones(songs::TAKE_ON_ME).unwrap();
     buzzer.play_tones(songs::TETRIS).unwrap();
+    buzzer.play_tones(songs::THE_LION_SLEEPS_TONIGHT).unwrap();
     buzzer.play_tones(songs::ZELDA_LULLABY).unwrap();
+    buzzer.play_tones(songs::ZELDA_THEME).unwrap();
 
     println!("Done.");
 
