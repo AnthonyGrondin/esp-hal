@@ -408,3 +408,39 @@ macro_rules! esp_app_desc {
         );
     };
 }
+
+pub fn bootloader_sha_flash_contents(
+    mut flash_offset: u32,
+    mut len: u32,
+    hasher: &mut impl digest::Update,
+) {
+    // 1024-byte stack buffer. This is a multiple of both 64 bytes (SHA-256 block size)
+    // and 128 bytes (SHA-512 block size), ensuring optimal HW SHA performance without
+    // overflowing the bootloader stack.
+    let mut chunk_buf = [0u32; 256];
+
+    while len > 0 {
+        let read_len = len.min(1024);
+
+        // esp_rom_spiflash_read requires 4-byte aligned length and flash_offset.
+        // We ensure we read in multiples of 4 by aligning up the length if it's the last chunk.
+        let aligned_read_len = (read_len + 3) & !3;
+
+        unsafe {
+            esp_rom_sys::rom::spiflash::esp_rom_spiflash_read(
+                flash_offset,
+                chunk_buf.as_mut_ptr(),
+                aligned_read_len,
+            );
+        }
+
+        let data_slice = unsafe {
+            core::slice::from_raw_parts(chunk_buf.as_ptr() as *const u8, read_len as usize)
+        };
+
+        hasher.update(data_slice);
+
+        flash_offset += read_len;
+        len -= read_len;
+    }
+}

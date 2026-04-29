@@ -113,6 +113,83 @@ impl<'a> PartitionEntry<'a> {
     {
         FlashRegion { raw: self, flash }
     }
+
+    /// Calculate the SHA256 of the partition.
+    ///
+    /// For App and Bootloader partitions, this reads the image header and segments
+    /// to determine the exact image length (including padding and checksum), and hashes
+    /// only the image content. If the image has an appended hash, it is NOT included
+    /// in the hashed content, matching ESP-IDF behavior.
+    /// For Data partitions, the entire partition is hashed.
+    pub fn get_sha256(&self, hasher: &mut impl digest::Update) -> Result<(), Error> {
+        let pt = self.partition_type();
+        match pt {
+            PartitionType::App(_) | PartitionType::Bootloader(_) => {
+                let mut image_len = 24; // size of esp_image_header_t
+                let mut header = [0u32; 8];
+                // Read 32 bytes aligned (24 bytes needed)
+                unsafe {
+                    esp_rom_sys::rom::spiflash::esp_rom_spiflash_read(
+                        self.offset(),
+                        header.as_mut_ptr(),
+                        32,
+                    );
+                }
+
+                let header_bytes =
+                    unsafe { core::slice::from_raw_parts(header.as_ptr() as *const u8, 32) };
+
+                let magic = header_bytes[0];
+                if magic != 0xE9 {
+                    return Err(Error::InvalidPartition {
+                        expected_size: 0,
+                        expected_type: pt,
+                    });
+                }
+
+                let segment_count = header_bytes[1];
+
+                let mut current_offset = self.offset() + 24;
+                for _ in 0..segment_count {
+                    let mut seg_header = [0u32; 8];
+                    let aligned_offset = current_offset & !3;
+                    let diff = (current_offset - aligned_offset) as usize;
+                    let aligned_len = ((8 + diff + 3) & !3) as u32;
+
+                    unsafe {
+                        esp_rom_sys::rom::spiflash::esp_rom_spiflash_read(
+                            aligned_offset,
+                            seg_header.as_mut_ptr(),
+                            aligned_len,
+                        );
+                    }
+
+                    let seg_bytes = unsafe {
+                        core::slice::from_raw_parts(seg_header.as_ptr() as *const u8, 32)
+                    };
+
+                    let data_len =
+                        u32::from_le_bytes(seg_bytes[diff + 4..diff + 8].try_into().unwrap());
+
+                    current_offset += 8 + data_len;
+                    image_len += 8 + data_len;
+                }
+
+                let mut length = image_len + 1; // Add a byte for the checksum
+                length = (length + 15) & !15; // Pad to next full 16 byte block
+
+                if length > self.len() {
+                    return Err(Error::OutOfBounds);
+                }
+
+                crate::bootloader_sha_flash_contents(self.offset(), length, hasher);
+            }
+            PartitionType::Data(_) | PartitionType::PartitionTable(_) => {
+                crate::bootloader_sha_flash_contents(self.offset(), self.len(), hasher);
+            }
+        }
+        Ok(())
+    }
 }
 
 impl core::fmt::Debug for PartitionEntry<'_> {

@@ -31,6 +31,7 @@ test  = true
 [dependencies]
 cfg-if = "1"
 defmt = { version = "1.0.1", optional = true }
+digest = { version = "0.10.7", default-features = false }
 document-features = "0.2"
 esp-config = { version = "0.7.0", path = "../esp-config" }
 esp-hal-procmacros = { version = "0.22.0", path = "../esp-hal-procmacros", features = ["__esp_idf_bootloader"] }
